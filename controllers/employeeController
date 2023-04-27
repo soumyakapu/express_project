@@ -1,0 +1,65 @@
+const asynHandle = require('express-async-handler')
+const EmpData=require('../models/employeeModel')
+const bcrypt=require('bcrypt')
+const jwt=require('jsonwebtoken')
+// for registering the employee
+const employeeRegister=asynHandle(async(req,res)=>{
+    const{empName,email,password}=req.body
+    if(!empName || !email || !password){
+        res.status(400);
+        throw new Error('All fileds are mandatory')
+    }
+
+    const employeeAvailable=await EmpData.findOne({email})
+    if(employeeAvailable){
+        res.status(400);
+        throw new Error('Employee already registered')
+    }
+    //hash password
+    const hashPassword=await bcrypt.hash(password,10);
+    const employee=await EmpData.create({
+        empName,
+        email,
+        password: hashPassword,
+     } );
+     console.log(employee)
+     if(employee){
+        res.status(201).json({_id:employee.id,empName:employee.empName,email:employee.email})
+     }
+     else{
+        res.status(400)
+        throw new Error('employee data not valid')
+     } 
+    res.json({message:'employee registered'})
+})
+const loginEmployee=asynHandle(async(req,res)=>{
+    const{email,password}= req.body;
+    if(!email || !password){
+        res.status(400)
+        throw new Error('All fields are mandatory')
+    }
+    const Employee=await EmpData.findOne({email})
+    //compare
+    if(Employee && (await bcrypt.compare(password,Employee.password))){
+        const accesToken=jwt.sign({
+            Employee:{
+                empName:Employee.empName,
+                email:Employee.email,
+                id:Employee.id,
+            },
+        },process.env.ACCESS_TOKEN_SECRET,
+        {expiresIn:'3m'}
+        );
+        res.status(200).json({accesToken});
+    }
+    else{
+        res.status(401)
+        throw new Error('email or password are not valid')
+    }
+    res.json({message:'login the employee'})
+})
+const currentEmployee=asynHandle(async(req,res)=>{
+
+    res.json(res.EmpData);
+})
+module.exports={employeeRegister,loginEmployee,currentEmployee}
